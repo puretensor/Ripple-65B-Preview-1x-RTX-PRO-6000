@@ -173,8 +173,10 @@ CUDA-graph capture). Then `bench.py`:
 | Profile | code-v1 | reasoning-v1 | Tokens per step | Against the Verified runs |
 |---|---:|---:|---|---|
 | `dflash` | 131.9 | 101.6 | 6.74 at 51.1 ms / 5.26 at 51.6 ms | 2.4% lower / 3.8% higher |
+| `tp2` | 206.8 | 158.2 | 6.68 at 32.7 ms / 5.17 at 32.7 ms | 2.6% lower / 4.1% higher |
 
-Step time matches the Verified runs (51.6 ms). The difference is tokens per step, which moves with the exact output.
+Step time matches the Verified runs (51.6 ms on one card, 32.3-32.7 ms on two). The difference is tokens per step, which
+moves with the exact output.
 
 ## Credits
 
