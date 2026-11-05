@@ -35,8 +35,9 @@ warmups. Ripple always reasons when it needs to (there is no thinking switch), s
   and prefills at 3.4K tok/s. With 15,699 tokens it decodes at [98.5](https://www.localmaxxing.com/runs/cmw2sfcs00bcjoa01ciqggo8d),
   prefills at 3.5K tok/s and shows its first token after 4.5 s.
 - **In a coding agent.** Through our agent harness (omp, with about 18K tokens of system prompt and tools in front of
-  every request, and its own sampling settings) we saw a steady 50-70 tok/s on prose and 110-120 on long code after
-  warmup. The longer context and non-greedy sampling both lower the tokens accepted per step.
+  every request) we saw a steady 50-70 tok/s on prose and 110-120 on long code after warmup. That is below the bare-API
+  numbers: the long context makes each step slower, and the agent samples with its own settings rather than at
+  temperature 0.
 
 ## Is it any good? Early signs, not a thorough test
 
@@ -148,7 +149,16 @@ acceptance softmax; FP8 k/v scales forced to 1.0 because the KV cache is BF16), 
 because acceptance moves run to run, plus the profiler capture above. Nothing beat the vendor's flags, so there was no
 gain to confirm with fresh-boot A/B runs.
 
-{{FRESH}}
+**Reproduced from a fresh clone** on the same card, 5 November, with the CPU in its normal state (no performance
+window) and the default 64K context. `start.sh` built `.venv` from `requirements.lock`, reused the pinned weights already
+on disk, checked the plugin hashes and was serving in 354 s (a first start, including FlashInfer autotuning and
+CUDA-graph capture). Then `bench.py`:
+
+| Profile | code-v1 | reasoning-v1 | Tokens per step | Against the Verified runs |
+|---|---:|---:|---|---|
+| `dflash` | 131.9 | 101.6 | 6.74 at 51.1 ms / 5.26 at 51.6 ms | 2.4% lower / 3.8% higher |
+
+Step time matches the Verified runs (51.6 ms). The difference is tokens per step, which moves with the exact output.
 
 ## Credits
 
