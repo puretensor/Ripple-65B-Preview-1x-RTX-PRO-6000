@@ -1,6 +1,7 @@
 # Ripple-65B Preview on one RTX PRO 6000 Blackwell
 
 **135.2 tok/s on code and 97.9 on reasoning, batch 1, from a dense 65B on one card.** Without a drafter it does 24.0.
+On two cards, `./start.sh tp2` does **212.4 and 152.0**.
 Ricursive's NVFP4 weights and their DFlash2 drafter, on SGLang 0.5.19, with the vendor's own flags.
 
 On our own long-output prompts it holds **75.9 tok/s writing an essay and a poem** and **130.8 tok/s writing a
@@ -27,6 +28,7 @@ warmups. Ripple always reasons when it needs to (there is no thinking switch), s
 |---|---|---:|---:|---|---:|
 | `dflash` (default) | DFlash2, 16-token blocks | [**135.2**](https://www.localmaxxing.com/runs/cmw2sfbvd0bcdoa01shm40fuh) | [**97.9**](https://www.localmaxxing.com/runs/cmw2sfbi20bcaoa01hqj3newo) | 6.9 / 5.1 at 51.6 ms | [75.9](https://www.localmaxxing.com/runs/cmw2xzw1n0bgeoa01atqkp6l2) / [130.8](https://www.localmaxxing.com/runs/cmw2xzwmh0bghoa017hrwhnx9) |
 | `nospec` | none | [24.0](https://www.localmaxxing.com/runs/cmw2s16bu0bc7oa01jms6k4uk) | [24.0](https://www.localmaxxing.com/runs/cmw2s15m70bc4oa01fzbv9hen) | 1 at 41.7 ms | |
+| `tp2` (two cards) | DFlash2, 16-token blocks | [**212.4**](https://www.localmaxxing.com/runs/cmw346qh50bi6oa01ppqdfwov) | [**152.0**](https://www.localmaxxing.com/runs/cmw346r1m0bi9oa01bafzu0wk) | 6.9 / 5.0 at 32.5 ms | |
 
 - **code-v1 and reasoning-v1** are LocalMaxxing's canonical prompts, and those four runs are Verified.
 - **Our prompts** are "write an essay and a poem about regret" (2,168 tokens out) and "write a simple python
@@ -38,6 +40,19 @@ warmups. Ripple always reasons when it needs to (there is no thinking switch), s
   every request) we saw a steady 50-70 tok/s on prose and 110-120 on long code after warmup. That is below the bare-API
   numbers: the long context makes each step slower, and the agent samples with its own settings rather than at
   temperature 0.
+
+## Two cards: `./start.sh tp2`
+
+On two of the same cards (PCIe Gen5, no NVLink, peer-to-peer on), tensor parallel 2 cuts the verify step from 51.2 to
+32.4 ms at the same tokens per step: **212.4 tok/s on code-v1 and 152.0 on reasoning-v1**
+([code-v1 run](https://www.localmaxxing.com/runs/cmw346qh50bi6oa01ppqdfwov), [reasoning-v1 run](https://www.localmaxxing.com/runs/cmw346r1m0bi9oa01bafzu0wk), both Verified). Our tuning harness confirmed it over 3 paired fresh boots against one card: x1.589
+[95% CI 1.512-1.641].
+
+- Each card reads half the weights, so the bandwidth-bound part of the step halves. About 160 all-reduces of a 160 KiB
+  tensor per step cost 3-5 ms over PCIe; SGLang's custom all-reduce (on by default) is 2 ms per step faster than NCCL.
+- If either card holds other work, SGLang refuses unequal free memory; the profile sets
+  `SGLANG_ENABLE_TP_MEMORY_INBALANCE_CHECK=false`, and the KV cache is sized from the smaller card.
+- Needs about 50 GB free on each card.
 
 ## Is it any good? Early signs, not a thorough test
 
@@ -108,6 +123,7 @@ calibrated FP8 or NVFP4 attention export. That is a quantization project, not a 
 ./start.sh --list              # profiles and their measured numbers
 ./start.sh                     # NVFP4 + DFlash2 (default)
 ./start.sh nospec              # no drafter, the reference
+./start.sh tp2                 # two cards, tensor parallel 2 (GPU=0,1)
 ./start.sh dflash --print      # print the exact server command, start nothing
 GPU=1 PORT=8001 ./start.sh     # pick the card and port
 CONTEXT=32768 ./start.sh       # the context of the Verified runs (default 65536; decode speed is the same)
